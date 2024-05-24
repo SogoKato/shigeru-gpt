@@ -1,4 +1,5 @@
 import glob
+import os
 from argparse import ArgumentParser
 
 import pandas as pd
@@ -12,13 +13,31 @@ def main():
     args = parser.parse_args()
     if not args.save_dir.endswith("/"):
         args.save_dir += "/"
-    data_path = txt_to_csv(args.glob, args.save_dir)
-    df = pd.read_csv(data_path, index_col=0)
-    df["embedding"] = df.text.apply(lambda x: get_embedding(x))
-    df.to_csv(data_path)
+    save_path = f"{args.save_dir}data.csv"
+    if os.path.exists(save_path):
+        df = extend_data(args.glob, save_path)
+    else:
+        yn = input("Do you want to create a new csv?")
+        if yn != "yes":
+            return
+        df = init_data(args.glob, save_path)
+    df.to_csv(save_path)
 
 
-def txt_to_csv(path: str, save_dir: str) -> str:
+def extend_data(path: str, save_path: str) -> pd.DataFrame:
+    files = glob.glob(path)
+    df = pd.read_csv(save_path, index_col=0)
+    i = len(df)
+    for file in files:
+        with open(file, "r") as f:
+            lines = f.readlines()
+        for line in lines:
+            df.loc[i] = [line, get_embedding(line)]
+            i += 1
+    return df
+
+
+def init_data(path: str, save_path: str) -> pd.DataFrame:
     files = glob.glob(path)
     data = "index,text\n"
     i = 0
@@ -28,10 +47,11 @@ def txt_to_csv(path: str, save_dir: str) -> str:
         for line in lines:
             data += f"{i},{line}"
             i += 1
-    save_path = f"{save_dir}data.csv"
     with open(save_path, "w") as f:
         f.write(data)
-    return save_path
+    df = pd.read_csv(save_path, index_col=0)
+    df["embedding"] = df.text.apply(lambda x: get_embedding(x))
+    return df
 
 
 def get_embedding(text, model="text-embedding-3-small"):
