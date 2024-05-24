@@ -1,4 +1,5 @@
-from logging import getLogger
+import os
+from logging import INFO, StreamHandler, getLogger
 from typing import Optional
 
 import numpy as np
@@ -19,6 +20,10 @@ from openai import OpenAI
 
 app = FastAPI()
 logger = getLogger(__name__)
+std_handler = StreamHandler()
+std_handler.setLevel(INFO)
+logger.addHandler(std_handler)
+logger.setLevel(INFO)
 
 configuration = Configuration(
     access_token=config.line_channel_access_token.get_secret_value()
@@ -28,7 +33,10 @@ handler = WebhookHandler(config.line_channel_secret.get_secret_value())
 
 @app.get("/readyz")
 def read_root():
-    return {"status": "ok"}
+    data = os.path.exists(config.data_path)
+    if not data:
+        logger.warning(f"{config.data_path} does not exist!")
+    return {"data": data}
 
 
 @app.post("/callback")
@@ -47,6 +55,9 @@ async def callback(
 @handler.add(MessageEvent, message=TextMessageContent)
 def handle_message(event: MessageEvent):
     logger.info(event.json())
+    if event.message.text.strip()[-1] not in ["?", "？", "❓", "❔"]:
+        logger.info("Ignoring message as it is not a question.")
+        return
     ans = answer_with_embedding_based_search(event.message.text)
     with ApiClient(configuration) as api_client:
         line_bot_api = MessagingApi(api_client)
