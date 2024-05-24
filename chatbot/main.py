@@ -1,3 +1,4 @@
+import hashlib
 import os
 from logging import INFO, StreamHandler, getLogger
 from typing import Optional, TypedDict
@@ -33,10 +34,14 @@ handler = WebhookHandler(config.line_channel_secret.get_secret_value())
 
 @app.get("/readyz")
 def read_root():
-    data = os.path.exists(config.data_path)
-    if not data:
+    data_sha256 = ""
+    if os.path.exists(config.data_path):
+        with open(config.data_path, "rb") as f:
+            d = hashlib.file_digest(f, "sha256")
+        data_sha256 = d.hexdigest()
+    if not data_sha256:
         logger.warning(f"{config.data_path} does not exist!")
-    return {"data": data}
+    return {"data": f"sha256:{data_sha256}"}
 
 
 @app.post("/callback")
