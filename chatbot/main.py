@@ -14,6 +14,7 @@ from linebot.v3.messaging import (
     Configuration,
     MessagingApi,
     ReplyMessageRequest,
+    ShowLoadingAnimationRequest,
     TextMessage,
 )
 from linebot.v3.webhooks import MessageEvent, TextMessageContent
@@ -59,13 +60,22 @@ async def callback(
 
 @handler.add(MessageEvent, message=TextMessageContent)
 def handle_message(event: MessageEvent):
-    logger.info(event.json())
-    if event.message.text.strip()[-1] not in ["?", "？", "❓", "❔"]:
-        logger.info("Ignoring message as it is not a question.")
-        return
-    conversation_id = (
-        event.source.user_id if event.source.type == "user" else event.source.group_id
-    )
+    logger.info(event.json(ensure_ascii=False))
+    if event.source.type == "user":
+        conversation_id = event.source.user_id
+        with ApiClient(configuration) as api_client:
+            line_bot_api = MessagingApi(api_client)
+            line_bot_api.show_loading_animation_with_http_info(
+                ShowLoadingAnimationRequest(
+                    chatId=conversation_id,
+                    loadingSeconds=60,
+                )
+            )
+    else:
+        conversation_id = event.source.group_id
+        if event.message.text.strip()[-1] not in ["?", "？", "❓", "❔"]:
+            logger.info("Ignoring message as it is not a question.")
+            return
     ans = answer_with_embedding_based_search(event.message.text, conversation_id)
     with ApiClient(configuration) as api_client:
         line_bot_api = MessagingApi(api_client)
