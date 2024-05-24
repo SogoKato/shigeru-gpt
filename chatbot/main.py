@@ -1,6 +1,6 @@
 import os
 from logging import INFO, StreamHandler, getLogger
-from typing import Optional
+from typing import Optional, TypedDict
 
 import numpy as np
 import pandas as pd
@@ -58,7 +58,10 @@ def handle_message(event: MessageEvent):
     if event.message.text.strip()[-1] not in ["?", "？", "❓", "❔"]:
         logger.info("Ignoring message as it is not a question.")
         return
-    ans = answer_with_embedding_based_search(event.message.text)
+    conversation_id = (
+        event.source.user_id if event.source.type == "user" else event.source.group_id
+    )
+    ans = answer_with_embedding_based_search(event.message.text, conversation_id)
     with ApiClient(configuration) as api_client:
         line_bot_api = MessagingApi(api_client)
         line_bot_api.reply_message_with_http_info(
@@ -78,29 +81,63 @@ Relevant info:
 """
 
 
-def answer_with_embedding_based_search(query: str) -> str:
+def answer_with_embedding_based_search(query: str, conversation_id: str) -> str:
     client = OpenAI()
     df = read_data()
     search_result = embeddings_search(df=df, query=query)
     info = "\n\n".join(search_result)
     q = query_template.format(query=query, info=info)
     logger.info(q)
+    messages = init_messages(conversation_id=conversation_id)
+    messages.append({"role": "user", "content": q})
+    logger.info(messages)
     res = client.chat.completions.create(
-        messages=[
-            {"role": "system", "content": config.system_prompt},
-            {"role": "user", "content": q},
-        ],
+        messages=messages,
         model=config.openai_model,
         temperature=config.openai_temp,
     )
     logger.info(res)
+    save_message(
+        conversation_id=conversation_id, message={"role": "user", "content": query}
+    )
+    ret = res.choices[0].message.content
+    save_message(
+        conversation_id=conversation_id, message={"role": "assistant", "content": ret}
+    )
     return res.choices[0].message.content
+
+
+class Message(TypedDict):
+    role: str
+    content: str
+
+
+history: dict[str, list[Message]] = {}
+
+
+def init_messages(conversation_id: str) -> list[Message]:
+    ret: list[Message] = [
+        {"role": "system", "content": config.system_prompt},
+    ]
+    if conversation_id not in history.keys():
+        return ret
+    ret.extend(history[conversation_id])
+    return ret
+
+
+def save_message(conversation_id: str, message: Message):
+    hist = history.get(conversation_id, [])
+    if len(hist) >= config.max_history_per_conversation:
+        start = len(hist) - config.max_history_per_conversation + 1
+        history[conversation_id] = history[conversation_id][start:]
+    if len(hist) == 0:
+        history[conversation_id] = []
+    history[conversation_id].append(message)
 
 
 def read_data() -> pd.DataFrame:
     df = pd.read_csv(config.data_path, index_col=0)
     df["embedding"] = df.embedding.apply(eval).apply(np.array)
-    logger.info(df)
     return df
 
 

@@ -10,6 +10,7 @@ class Config(BaseSettings):
     system_prompt: str = "You are a helpful assistant."
     openai_model: str = "gpt-3.5-turbo"
     openai_temp: int = 0
+    max_history_per_conversation: int = 6
 
 
 config = Config()
