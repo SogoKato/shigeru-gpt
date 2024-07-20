@@ -33,7 +33,7 @@ Relevant info:
             {"role": "system", "content": "You are a helpful assistant."},
             {"role": "user", "content": q},
         ],
-        model="gpt-3.5-turbo",
+        model="gpt-4o-mini",
         temperature=0,
     )
     print(res)

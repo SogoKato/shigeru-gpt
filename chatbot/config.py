@@ -8,7 +8,7 @@ class Config(BaseSettings):
     openai_api_key: SecretStr
     data_path: str = "../data/embed/data.csv"
     system_prompt: str = "You are a helpful assistant."
-    openai_model: str = "gpt-3.5-turbo"
+    openai_model: str = "gpt-4o-mini"
     openai_temp: int = 0
     max_history_per_conversation: int = 6
 
