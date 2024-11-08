@@ -99,6 +99,7 @@ def find_links_from(url: str) -> list[str]:
 
 @dataclass
 class Article:
+    url: str
     title: str
     author: str
     published_at: str
@@ -121,6 +122,7 @@ def save_article(article: Article, path: str):
     env = Environment(loader=FileSystemLoader("."))
     template = env.get_template("template.txt.j2")
     out = template.render(
+        url=article.url,
         title=article.title,
         published_at=article.published_at,
         author=article.author,
@@ -145,6 +147,7 @@ def get_article(url: str) -> Article:
         pagination_index += 1
         time.sleep(1)
     return Article(
+        url=url,
         title=page.title,
         content=content,
         published_at=page.published_at,
