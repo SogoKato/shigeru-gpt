@@ -1,5 +1,8 @@
 import hashlib
+import json
 import os
+from base64 import b64decode
+from dataclasses import dataclass
 from logging import INFO, StreamHandler, getLogger
 from typing import Optional, TypedDict
 
@@ -99,8 +102,8 @@ Relevant info:
 def answer_with_embedding_based_search(query: str, conversation_id: str) -> str:
     client = OpenAI()
     df = read_data()
-    search_result = embeddings_search(df=df, query=query)
-    info = "\n\n".join(search_result)
+    search_results = embeddings_search(df=df, query=query)
+    info = "\n\n".join([sr.to_string() for sr in search_results])
     q = query_template.format(query=query, info=info)
     logger.info(q)
     messages = init_messages(conversation_id=conversation_id)
@@ -156,11 +159,33 @@ def read_data() -> pd.DataFrame:
     return df
 
 
-def embeddings_search(df: pd.DataFrame, query: str, n: int = 3) -> list[str]:
+@dataclass
+class SearchResult:
+    metadata: dict[str, str]
+    text: str
+
+    def to_string(self) -> str:
+        ret = ""
+        for k, v in self.metadata.items():
+            ret += f"{k}: {v}\n"
+        ret += self.text
+        return ret
+
+
+def embeddings_search(df: pd.DataFrame, query: str, n: int = 2) -> list[SearchResult]:
     embedding = get_embedding(query)
     df["similarities"] = df.embedding.apply(lambda x: cosine_similarity(x, embedding))
     res = df.sort_values("similarities", ascending=False).head(n)
-    return [i for i in res.text]
+    ret = []
+    for _, row in res.iterrows():
+        metadata = json.loads(b64decode(row["metadata"]))
+        ret.append(
+            SearchResult(
+                metadata=metadata,
+                text=row["text"],
+            )
+        )
+    return ret
 
 
 def get_embedding(text: str, model: str = "text-embedding-3-small"):
