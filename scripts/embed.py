@@ -1,6 +1,7 @@
 import glob
 import os
 from argparse import ArgumentParser
+from base64 import b64encode
 
 import pandas as pd
 from openai import OpenAI
@@ -13,7 +14,7 @@ def main():
     args = parser.parse_args()
     if not args.save_dir.endswith("/"):
         args.save_dir += "/"
-    save_path = f"{args.save_dir}data.csv"
+    save_path = f"{args.save_dir}datav2.csv"
     if os.path.exists(save_path):
         df = extend_data(args.glob, save_path)
     else:
@@ -39,13 +40,17 @@ def extend_data(path: str, save_path: str) -> pd.DataFrame:
 
 def init_data(path: str, save_path: str) -> pd.DataFrame:
     files = glob.glob(path)
-    data = "index,text\n"
+    data = "index,metadata,text\n"
     i = 0
     for file in files:
         with open(file, "r") as f:
             lines = f.readlines()
-        for line in lines:
-            data += f"{i},{line}"
+        metadata = ""
+        for j, line in enumerate(lines):
+            if j == 0:
+                metadata = b64encode(line.strip().encode()).decode()
+                continue
+            data += f"{i},{metadata},{line}"
             i += 1
     with open(save_path, "w") as f:
         f.write(data)
