@@ -79,7 +79,10 @@ def handle_message(event: MessageEvent):
         if event.message.text.strip()[-1] not in ["?", "？", "❓", "❔"]:
             logger.info("Ignoring message as it is not a question.")
             return
-    ans = answer_with_embedding_based_search(event.message.text, conversation_id)
+    try:
+        ans = answer_with_embedding_based_search(event.message.text, conversation_id)
+    except Exception:
+        ans = "バグったよ🥺"
     with ApiClient(configuration) as api_client:
         line_bot_api = MessagingApi(api_client)
         line_bot_api.reply_message_with_http_info(
